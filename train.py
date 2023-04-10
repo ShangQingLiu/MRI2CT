@@ -28,26 +28,31 @@ def train():
     if not os.path.isdir(os.path.join(basedir, name)):
         os.makedirs(os.path.join(basedir, name))
 
-    dataset = MultiRayDataset(args)                                          #data here into dataloader, HERE WE LOAD THE NEW DATASET WITH MULTIPLE VOLUMES
-    dataloader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        pin_memory=True,
-        num_workers=4,
-    )
 
-    latent_embeddings = latent_embeddings(XXXXXXX)
+    #we now need to load 2 different datasets, a pretrain dataset and a finetune dataset   
+
+    #dataset = MultiRayDataset(args)                                          #data here into dataloader, HERE WE LOAD THE NEW DATASET WITH MULTIPLE VOLUMES
+    #dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4,)
+
+    pretrain_dataset = MultiRayDataset()
+
+
+
+    latent_embeddings = latent_embeddings(XXXXXXX)     #INIT HEREEEE
 
     model = EmbeddingNeRF(
         args.netdepth,
         args.netwidth,
         5,
         multi_res=args.multires,
+        latent_dim = latent_dim,
     ).to(device)
     if args.use_wandb:
         wandb.watch(model, log_freq=100)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(list(model.parameters()) + [latent_embeddings], lr=args.lr) #<----- optimize weights AND embedding
+    latent_optimizer = torch.optim.Adam([latent_embeddings], lr=args.lr)
+    
     scheduler = torch.optim.lr_scheduler.ExponentialLR(
         # optimizer, gamma=0.1 ** (1 / args.N_epoches / args.lr_decay_ratio)
         optimizer,
@@ -71,20 +76,44 @@ def train():
 
     #pretraining across objects
     for epoch in range(start_epoch, args.N_epoches + 1):
+        optimizer.zero_grad()
+        for data in dataloader:
+            B, N, _ = data["pts"].shape
+            pts = data["pts"].view(-1, 5).to(device)
+            vals = data["vals"].view(-1, 1).to(device)
 
+            # CHANGE: Get the object index and obtain the corresponding latent embeddings
+            object_idx = data["object_idx"].to(device)
+            object_latent_embedding = latent_embeddings[object_idx]
+
+            # CHANGE: Pass object_latent_embedding to the model
+            raw = model(pts, object_latent_embedding)
+            loss = args.lambda_vols * crit_mae(raw, vals) * args.std_val / args.N_step_opt
+
+            loss.backward()
+            if step % args.N_step_opt == 0:
+                optimizer.step()
+                optimizer.zero_grad()
 
 
 
     #object specific finetune training
     for epoch in range(start_epoch, args.N_epoches + 1):
-        optimizer.zero_grad()
+        latent_optimizer.zero_grad()
         for data in dataloader:                             # batch by batch
             B, N, _ = data["pts"].shape                     #batch size b, number of points n
             pts = data["pts"].view(-1, 5).to(device)        #reshaping wiht view()
             vals = data["vals"].view(-1, 1).to(device)      #gt semantic lables?
             inten = data["inten"].view(-1, 1).to(device)    #intensity values
 
-            raw = model(pts)
+
+            #modified to incorporate object specific embedding
+            object_idx = data["object_idx"].to(device)
+            object_latent_embedding = latent_embeddings[object_idx]
+            raw = model(pts, object_latent_embedding)
+
+
+
             output = raw2outputs(
                 raw.view(B, N), args.raw_noise_std / args.std_val
             )[..., None]
@@ -100,8 +129,8 @@ def train():
 
             loss.backward()                                 #compute gradients
             if step % args.N_step_opt == 0:                 #only optimize every N_step_opt steps
-                optimizer.step()                            #update params
-                optimizer.zero_grad()                       #reset gradients to 0
+                latent_optimizer.step()                            #update params
+                latent_optimizer.zero_grad()                       #reset gradients to 0
 
             if step % args.N_step_log == 0:
                 metrics = {

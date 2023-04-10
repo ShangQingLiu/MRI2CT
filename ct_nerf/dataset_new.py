@@ -16,6 +16,8 @@ class MultiRayDataset(Dataset):
         self.N_samples = args.N_samples                             #nr of samples along each ray
         self.perturb = args.perturb                                 #ammount of perturbation to ray direction vectors?
         self.valid_views = ["axial", "sagital", "coronal"]
+        self.mode = mode
+
 
         
         ###my addition
