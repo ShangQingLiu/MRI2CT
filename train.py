@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from ct_nerf.utils import raw2outputs
 
-from ct_nerf.dataset import RayDataset
+from ct_nerf.dataset_new import RayDataset, MultiRayDataset
 from ct_nerf.logger import logger
 from ct_nerf.network import NeRF
 from ct_nerf.parser import config_parser
@@ -34,11 +34,22 @@ def train():
     #dataset = MultiRayDataset(args)                                          #data here into dataloader, HERE WE LOAD THE NEW DATASET WITH MULTIPLE VOLUMES
     #dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4,)
 
-    pretrain_dataset = MultiRayDataset()
+
+
+    pretrain_dataset = MultiRayDataset(args)
+    pretrain_dataloader = DataLoader(pretrain_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4,)
+
+
+    finetune_dataset = RayDataset(args)     
+    finetune_dataloader = DataLoader(finetune_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4,)
 
 
 
-    latent_embeddings = latent_embeddings(XXXXXXX)     #INIT HEREEEE
+    #Embedding INIT
+    num_patients = len(pretrain_dataset)
+    latent_size = 256
+
+    latent_embeddings = latent_embeddings(num_patients, latent_size)     #INIT HEREEEE
 
     model = EmbeddingNeRF(
         args.netdepth,
@@ -77,7 +88,7 @@ def train():
     #pretraining across objects
     for epoch in range(start_epoch, args.N_epoches + 1):
         optimizer.zero_grad()
-        for data in dataloader:
+        for data in pretrain_dataloader:
             B, N, _ = data["pts"].shape
             pts = data["pts"].view(-1, 5).to(device)
             vals = data["vals"].view(-1, 1).to(device)
@@ -100,7 +111,7 @@ def train():
     #object specific finetune training
     for epoch in range(start_epoch, args.N_epoches + 1):
         latent_optimizer.zero_grad()
-        for data in dataloader:                             # batch by batch
+        for data in finetune_dataloader:                             # batch by batch
             B, N, _ = data["pts"].shape                     #batch size b, number of points n
             pts = data["pts"].view(-1, 5).to(device)        #reshaping wiht view()
             vals = data["vals"].view(-1, 1).to(device)      #gt semantic lables?

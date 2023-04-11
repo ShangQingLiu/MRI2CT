@@ -19,6 +19,10 @@ class MultiRayDataset(Dataset):
         self.mode = mode
 
 
+        # CHANGE: Added self.volume_indices
+        self.volume_indices = []
+
+
         
         ###my addition
 
@@ -46,6 +50,10 @@ class MultiRayDataset(Dataset):
             vol = sitk.GetArrayFromImage(vol)
             self.vol = (torch.from_numpy(vol) - args.min_val) / args.std_val
             self.volumes.append(vol)
+
+
+            # DONT THINK WE NEED THIS CHANGE: Append the current object index for each ray
+            # self.volume_indices += [len(self.volumes) - 1] * len(self.rays_o)
 
         self.H, self.D, self.W = self.vol.shape
         self.img_size = self.H * self.W
@@ -103,6 +111,8 @@ class MultiRayDataset(Dataset):
             "vals": vals,
             "inten": torch.Tensor([inten]),
             "theta": torch.Tensor([theta]),
+            #"object_idx": torch.Tensor([self.volume_indices[index]]),  # Add object index
+       
         }
 
     def sample_pts(self, indexes):                                  #pts
