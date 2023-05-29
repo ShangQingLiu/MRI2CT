@@ -4,11 +4,29 @@ import configargparse
 def config_parser():
     parser = configargparse.ArgumentParser()
     parser.add_argument(
+        "--num_steps", type=int, default=100000, help="Number of training steps."
+    )
+    parser.add_argument(
+        "--latent_size", type=int, default=512, help="size of latent vector."
+    )
+    parser.add_argument(
+        "--num_vols", type=int, default=1, help="number of volumes to pretrain."
+    )
+    parser.add_argument(
+        "--mode", type=int, default=1, help="0 = concat, 1 = addition"
+    )
+    parser.add_argument(
+        "--matrix_size", type=int, default=1, help="latent embedding matrix width, 1 default for latent vector"
+    )
+    parser.add_argument(
+        "--finetune_file", type=str, help="which file finetune" #default="ph90.mha", help="which file to do the latent embedding only finetuning on"
+    )
+    parser.add_argument(
         "--config", is_config_file=True, help="config file path"
     )
     parser.add_argument("--name", type=str, help="experiment name")
     parser.add_argument(
-        "-- /dir",
+        "--basedir",
         type=str,
         default="./logs/",
         help="where to store ckpts and logs",
@@ -16,13 +34,22 @@ def config_parser():
     parser.add_argument(
         "--vol_path",
         type=str,
-        default="/cluster/project/jbuhmann/xiali/datasets/4DCT/07-02-2003-NA-p4-14571/ph10.mha",
+        # default="/cluster/project/jbuhmann/xiali/datasets/4DCT/07-02-2003-NA-p4-14571/ph10.mha",
+        default="/homeL/1sliu/code/MRI2CT/datasets/07-02-2003-NA-p4-14571/ph10.mha",
         help="input data path",
+    )
+    parser.add_argument(
+        "--volumes_dir",
+        type=str,
+        # default="/homeL/1sliu/code/MRI2CT/datasets/07-02-2003-NA-p4-14571/",
+        default="/homeL/1sliu/code/MRI2CT/data",
+        help="What is root directory of volume",
     )
     parser.add_argument(
         "--proj_dir",
         type=str,
-        default="/cluster/project/jbuhmann/xiali/datasets/4DCT/07-02-2003-NA-p4-14571/ph10-projs",
+        # default="/cluster/project/jbuhmann/xiali/datasets/4DCT/07-02-2003-NA-p4-14571/",
+        default="/homeL/1sliu/code/MRI2CT/datasets/07-02-2003-NA-p4-14571/ph10-projs",
         help="input data path",
     )
     parser.add_argument(
@@ -60,7 +87,7 @@ def config_parser():
     parser.add_argument(
         "--N_epoches",
         type=int,
-        default=2,
+        default=3, #WAS 2
         help="epoch num in total",
     )
     parser.add_argument(
@@ -75,8 +102,8 @@ def config_parser():
     )
     parser.add_argument(
         "--resume",
-        action="store_true",
-        help="whether to resume from the stored epoch",
+        action="store_false",
+        help="store false, by default will resume from the stored epoch",
     )
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument(
@@ -173,5 +200,6 @@ def config_parser():
         default=1,
         help="frequency of weight ckpt saving over epoches",
     )
+
 
     return parser

@@ -26,7 +26,7 @@ class RayDataset(Dataset):
         ]
 
         vol = sitk.GetArrayFromImage(vol)
-        self.vol = (torch.from_numpy(vol) - args.min_val) / args.std_val
+        self.vol = (torch.from_numpy(vol) - args.min_val) / args.std_val                    #normalization
         self.H, self.D, self.W = self.vol.shape
         self.img_size = self.H * self.W
 
@@ -36,11 +36,19 @@ class RayDataset(Dataset):
         rays_d_list = []
         intens_list = []
 
-        for ang_ind in range(args.angles):
+        print(f"H: {self.H}, D: {self.D}, W: {self.W}, img_size: {self.img_size}")
+        
+        #empty hereprint(f"thetas: {len(self.thetas)}, matrixs: {len(self.matrixs)}, rays_o_list: {len(rays_o_list)}, rays_d_list: {len(rays_d_list)}")
+    
+    
+
+        for ang_ind in range(args.angles):      #180 times
+            
             theta = int(ang_ind / args.angles * 180)
+            #print(theta)
             self.thetas.append(theta)
             mat = rad2mat(theta / 180 * np.pi)
-            self.matrixs[theta] = mat
+            self.matrixs[theta] = mat    #contains the corresponding roation matrix
 
             rays_o, rays_d = get_rays(self.H, self.W, theta, mat)
             rays_o_list.append(rays_o)
@@ -49,17 +57,27 @@ class RayDataset(Dataset):
             proj_name = "{:03d}.npy".format(theta)
             proj_path = os.path.join(args.proj_dir, proj_name)
             intens = torch.from_numpy(np.load(proj_path))
+            #print("intemsshpe", intens.shape) #[H,W]
             intens_list.append(intens)
+        
 
         self.rays_o = torch.stack(rays_o_list, 0).view(-1, 3)
         self.rays_d = torch.stack(rays_d_list, 0).view(-1, 3)
         self.intens = torch.stack(intens_list, 0).view(-1, 1)
+        print("instens len", len(self.intens), len(self.rays_o), len(self.thetas), "nsamlples", self.N_samples)
+        print("matrix len", len(self.matrixs), "intenslist", len(intens_list))  #"matrix object", [i.shape for i in self.matrixs.values()]
+
+        #print(f"thetas: {len(self.thetas)}, matrixs: {len(self.matrixs)}, rays_o_list: {len(rays_o_list)}, rays_o_list object: {[i.shape for i in rays_o_list]}")
+        
+        
 
     def __len__(self):
-        return len(self.rays_o)                                     #number of rays
+        #len(rays)=HxWx180
+        return len(self.rays_o)      #= 13 086 720 = H * W * 180                               
 
     def __getitem__(self, index):
         theta = self.thetas[index // self.img_size]
+        #print("instens len", len(self.intens), len(self.rays_o, len(self.thetas), "nsamlples", self.N_samples)
         inten = self.intens[index]
         ray_o, ray_d = self.rays_o[index], self.rays_d[index]
 
